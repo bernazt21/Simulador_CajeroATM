@@ -1,0 +1,204 @@
+using SimuladorCajero.Application.DTOs;
+using SimuladorCajero.Application.Exceptions;
+using SimuladorCajero.Application.Interfaces;
+
+namespace SimuladorCajero.Application.Services;
+
+public sealed class CajeroService : ICajeroService
+{
+    private readonly ICuentaRepository _cuentaRepository;
+    private readonly ITransaccionRepository _transaccionRepository;
+    private readonly ITarjetaRepository _tarjetaRepository;
+    private readonly INipHasher _nipHasher;
+
+    public CajeroService(
+        ICuentaRepository cuentaRepository,
+        ITransaccionRepository transaccionRepository,
+        ITarjetaRepository tarjetaRepository,
+        INipHasher nipHasher)
+    {
+        _cuentaRepository = cuentaRepository
+            ?? throw new ArgumentNullException(nameof(cuentaRepository));
+
+        _transaccionRepository = transaccionRepository
+            ?? throw new ArgumentNullException(nameof(transaccionRepository));
+
+        _tarjetaRepository = tarjetaRepository
+            ?? throw new ArgumentNullException(nameof(tarjetaRepository));
+
+        _nipHasher = nipHasher
+            ?? throw new ArgumentNullException(nameof(nipHasher));
+    }
+
+    public async Task<SaldoDto> ConsultarSaldoAsync(
+        int idCuenta,
+        CancellationToken cancellationToken = default)
+    {
+        if (idCuenta <= 0)
+        {
+            throw new ReglaNegocioException(
+                "El identificador de la cuenta no es válido.");
+        }
+
+        var cuenta = await _cuentaRepository.ObtenerSaldoAsync(
+            idCuenta,
+            cancellationToken);
+
+        if (cuenta is null)
+        {
+            throw new ReglaNegocioException(
+                "La cuenta no existe.");
+        }
+
+        if (!cuenta.Activa)
+        {
+            throw new ReglaNegocioException(
+                "La cuenta se encuentra inactiva.");
+        }
+
+        return cuenta;
+    }
+
+    public async Task<MovimientoResultadoDto> DepositarAsync(
+        MovimientoRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidarMovimiento(request, "depósito");
+
+        await ConsultarSaldoAsync(
+            request.IdCuenta,
+            cancellationToken);
+
+        return await _transaccionRepository.RegistrarDepositoAsync(
+            request,
+            cancellationToken);
+    }
+
+    public async Task<MovimientoResultadoDto> RetirarAsync(
+        MovimientoRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidarMovimiento(request, "retiro");
+
+        var cuenta = await ConsultarSaldoAsync(
+            request.IdCuenta,
+            cancellationToken);
+
+        if (cuenta.Saldo < request.Monto)
+        {
+            throw new ReglaNegocioException(
+                "Saldo insuficiente para realizar la operación.");
+        }
+
+        return await _transaccionRepository.RegistrarRetiroAsync(
+            request,
+            cancellationToken);
+    }
+
+    public async Task CambiarNipAsync(
+        CambioNipRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request is null)
+        {
+            throw new ReglaNegocioException(
+                "Los datos para cambiar el NIP son obligatorios.");
+        }
+
+        if (request.IdTarjeta <= 0)
+        {
+            throw new ReglaNegocioException(
+                "El identificador de la tarjeta no es válido.");
+        }
+
+        ValidarNip(request.NuevoNip);
+
+        if (request.NuevoNip != request.ConfirmacionNuevoNip)
+        {
+            throw new ReglaNegocioException(
+                "El nuevo NIP y su confirmación no coinciden.");
+        }
+
+        var nuevoNipHash = _nipHasher.GenerarHash(
+            request.NuevoNip);
+
+        await _tarjetaRepository.CambiarNipAsync(
+            request.IdTarjeta,
+            nuevoNipHash,
+            cancellationToken);
+    }
+
+    public async Task<MovimientoResultadoDto> RevertirTransaccionAsync(
+        long idTransaccion,
+        ReversionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (idTransaccion <= 0)
+        {
+            throw new ReglaNegocioException(
+                "El identificador de la transacción no es válido.");
+        }
+
+        if (request is null ||
+            string.IsNullOrWhiteSpace(request.Motivo))
+        {
+            throw new ReglaNegocioException(
+                "El motivo de la reversión es obligatorio.");
+        }
+
+        if (request.Motivo.Length > 250)
+        {
+            throw new ReglaNegocioException(
+                "El motivo de la reversión no puede superar 250 caracteres.");
+        }
+
+        return await _transaccionRepository.RevertirAsync(
+            idTransaccion,
+            request,
+            cancellationToken);
+    }
+
+    private static void ValidarMovimiento(
+        MovimientoRequest request,
+        string tipoMovimiento)
+    {
+        if (request is null)
+        {
+            throw new ReglaNegocioException(
+                $"Los datos del {tipoMovimiento} son obligatorios.");
+        }
+
+        if (request.IdCuenta <= 0)
+        {
+            throw new ReglaNegocioException(
+                "El identificador de la cuenta no es válido.");
+        }
+
+        if (request.Monto <= 0)
+        {
+            throw new ReglaNegocioException(
+                $"El monto del {tipoMovimiento} debe ser mayor que cero.");
+        }
+    }
+
+    private static void ValidarNip(string nip)
+    {
+        if (string.IsNullOrWhiteSpace(nip))
+        {
+            throw new ReglaNegocioException(
+                "El nuevo NIP es obligatorio.");
+        }
+
+        if (nip.Length != 4)
+        {
+            throw new ReglaNegocioException(
+                "El NIP debe contener exactamente cuatro dígitos.");
+        }
+
+        if (nip.Any(caracter => !char.IsDigit(caracter)))
+        {
+            throw new ReglaNegocioException(
+                "El NIP solamente puede contener números.");
+        }
+    }
+}
