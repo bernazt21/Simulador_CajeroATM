@@ -24,4 +24,9 @@ public interface ICajeroService
         long idTransaccion,
         ReversionRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<AutenticacionResultadoDto> AutenticarAsync(
+        AutenticacionRequest request,
+        CancellationToken cancellationToken = default);
+
 }

@@ -158,6 +158,96 @@ public sealed class CajeroService : ICajeroService
             cancellationToken);
     }
 
+    public async Task<AutenticacionResultadoDto> AutenticarAsync(
+    AutenticacionRequest request,
+    CancellationToken cancellationToken = default)
+    {
+        if (request is null)
+        {
+            throw new ReglaNegocioException(
+                "Los datos de autenticación son obligatorios.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NumeroTarjeta) ||
+            request.NumeroTarjeta.Length != 16 ||
+            request.NumeroTarjeta.Any(
+                caracter => !char.IsDigit(caracter)))
+        {
+            throw new ReglaNegocioException(
+                "El número de tarjeta debe contener exactamente 16 dígitos.");
+        }
+
+        ValidarNip(request.Nip);
+
+        var tarjeta =
+            await _tarjetaRepository.ObtenerPorNumeroAsync(
+                request.NumeroTarjeta,
+                cancellationToken);
+
+        if (tarjeta is null)
+        {
+            throw new ReglaNegocioException(
+                "Número de tarjeta o NIP incorrectos.");
+        }
+
+        if (!tarjeta.Activa)
+        {
+            throw new ReglaNegocioException(
+                "La tarjeta se encuentra inactiva.");
+        }
+
+        if (tarjeta.Bloqueada)
+        {
+            throw new ReglaNegocioException(
+                "La tarjeta se encuentra bloqueada.");
+        }
+
+        if (tarjeta.FechaExpiracion.Date < DateTime.Today)
+        {
+            throw new ReglaNegocioException(
+                "La tarjeta se encuentra vencida.");
+        }
+
+        var nipCorrecto = _nipHasher.Verificar(
+            request.Nip,
+            tarjeta.NipHash);
+
+        if (!nipCorrecto)
+        {
+            tarjeta.RegistrarIntentoFallido();
+
+            await _tarjetaRepository.ActualizarEstadoAsync(
+                tarjeta,
+                cancellationToken);
+
+            if (tarjeta.Bloqueada)
+            {
+                throw new ReglaNegocioException(
+                    "NIP incorrecto. La tarjeta fue bloqueada después de tres intentos fallidos.");
+            }
+
+            throw new ReglaNegocioException(
+                $"NIP incorrecto. Intentos fallidos: {tarjeta.IntentosFallidos} de 3.");
+        }
+
+        if (tarjeta.IntentosFallidos > 0)
+        {
+            tarjeta.ReiniciarIntentosFallidos();
+
+            await _tarjetaRepository.ActualizarEstadoAsync(
+                tarjeta,
+                cancellationToken);
+        }
+
+        return new AutenticacionResultadoDto
+        {
+            IdTarjeta = tarjeta.IdTarjeta,
+            IdCuenta = tarjeta.IdCuenta,
+            NumeroTarjeta = tarjeta.NumeroTarjeta,
+            Mensaje = "Autenticación realizada correctamente."
+        };
+    }
+
     private static void ValidarMovimiento(
         MovimientoRequest request,
         string tipoMovimiento)

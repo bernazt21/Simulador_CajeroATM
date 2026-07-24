@@ -41,6 +41,23 @@ public class Tarjeta
         NipHash = nipHash;
     }
 
+    public void CargarEstadoSeguridad(
+    byte intentosFallidos,
+    bool bloqueada)
+    {
+        if (intentosFallidos > MaximoIntentosFallidos)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(intentosFallidos),
+                "Los intentos fallidos no pueden superar tres.");
+        }
+
+        IntentosFallidos = intentosFallidos;
+        Bloqueada =
+            bloqueada ||
+            intentosFallidos >= MaximoIntentosFallidos;
+    }
+
     public void RegistrarIntentoFallido()
     {
         if (Bloqueada)
