@@ -10,14 +10,16 @@ var builder = WebApplication.CreateBuilder(args);
 // Agregar controladores.
 builder.Services.AddControllers();
 
+
+
 // Agregar documentación OpenAPI.
 builder.Services.AddOpenApi();
 
 // Obtener la cadena de conexión desde appsettings.Development.json.
 var connectionString =
-    builder.Configuration.GetConnectionString("SimuladorCajero")
+    builder.Configuration.GetConnectionString("CajeroDb")
     ?? throw new InvalidOperationException(
-        "No se encontró la cadena de conexión 'SimuladorCajero'.");
+        "No se encontró la cadena de conexión 'CajeroDb'.");
 
 // Registrar la fábrica de conexiones.
 builder.Services.AddSingleton(
