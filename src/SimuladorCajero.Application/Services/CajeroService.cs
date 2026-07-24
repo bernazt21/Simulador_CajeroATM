@@ -10,12 +10,14 @@ public sealed class CajeroService : ICajeroService
     private readonly ITransaccionRepository _transaccionRepository;
     private readonly ITarjetaRepository _tarjetaRepository;
     private readonly INipHasher _nipHasher;
+    private readonly IJwtTokenService _jwtTokenService;
 
     public CajeroService(
         ICuentaRepository cuentaRepository,
         ITransaccionRepository transaccionRepository,
         ITarjetaRepository tarjetaRepository,
-        INipHasher nipHasher)
+        INipHasher nipHasher,
+        IJwtTokenService jwtTokenService)
     {
         _cuentaRepository = cuentaRepository
             ?? throw new ArgumentNullException(nameof(cuentaRepository));
@@ -28,6 +30,9 @@ public sealed class CajeroService : ICajeroService
 
         _nipHasher = nipHasher
             ?? throw new ArgumentNullException(nameof(nipHasher));
+
+        _jwtTokenService = jwtTokenService
+            ?? throw new ArgumentNullException(nameof(jwtTokenService));
     }
 
     public async Task<SaldoDto> ConsultarSaldoAsync(
@@ -308,11 +313,17 @@ public sealed class CajeroService : ICajeroService
                 cancellationToken);
         }
 
+        var tokenJwt = _jwtTokenService.GenerarToken(
+            tarjeta.IdTarjeta,
+            tarjeta.IdCuenta);
+
         return new AutenticacionResultadoDto
         {
             IdTarjeta = tarjeta.IdTarjeta,
             IdCuenta = tarjeta.IdCuenta,
             NumeroTarjeta = tarjeta.NumeroTarjeta,
+            Token = tokenJwt.Token,
+            ExpiracionUtc = tokenJwt.ExpiracionUtc,
             Mensaje = "Autenticación realizada correctamente."
         };
     }

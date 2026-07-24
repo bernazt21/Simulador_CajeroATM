@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SimuladorCajero.Application.DTOs;
 using SimuladorCajero.Application.Exceptions;
 using SimuladorCajero.Application.Interfaces;
 
 namespace SimuladorCajero.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/transacciones")]
 public sealed class TransaccionesController : ControllerBase

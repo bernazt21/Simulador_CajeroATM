@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SimuladorCajero.Application.DTOs;
 using SimuladorCajero.Application.Exceptions;
 using SimuladorCajero.Application.Interfaces;
 
 namespace SimuladorCajero.Api.Controllers;
 
+[AllowAnonymous]
 [ApiController]
 [Route("api/autenticacion")]
 public sealed class AutenticacionController : ControllerBase
