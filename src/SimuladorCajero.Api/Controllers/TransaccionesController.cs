@@ -95,6 +95,58 @@ public sealed class TransaccionesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Revierte una transacción aplicada sin eliminar su historial.
+    /// </summary>
+    [HttpDelete("{idTransaccion:long}")]
+    [ProducesResponseType(
+        typeof(MovimientoResultadoDto),
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<MovimientoResultadoDto>>
+        RevertirTransaccion(
+            long idTransaccion,
+            [FromBody] ReversionRequest request,
+            CancellationToken cancellationToken)
+    {
+        if (idTransaccion <= 0)
+        {
+            return BadRequest(new
+            {
+                mensaje =
+                    "El identificador de la transacción no es válido."
+            });
+        }
+
+        if (request is null ||
+            string.IsNullOrWhiteSpace(request.Motivo))
+        {
+            return BadRequest(new
+            {
+                mensaje =
+                    "El motivo de la reversión es obligatorio."
+            });
+        }
+
+        try
+        {
+            var resultado =
+                await _cajeroService.RevertirTransaccionAsync(
+                    idTransaccion,
+                    request,
+                    cancellationToken);
+
+            return Ok(resultado);
+        }
+        catch (ReglaNegocioException exception)
+        {
+            return BadRequest(new
+            {
+                mensaje = exception.Message
+            });
+        }
+    }
+
     private static string? ValidarMovimiento(
         MovimientoRequest request)
     {

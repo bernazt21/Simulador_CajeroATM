@@ -10,7 +10,17 @@ var builder = WebApplication.CreateBuilder(args);
 // Agregar controladores.
 builder.Services.AddControllers();
 
-
+// Permitir pruebas desde clientes web externos durante desarrollo.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ScalarClient", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 // Agregar documentación OpenAPI.
 builder.Services.AddOpenApi();
@@ -50,6 +60,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors("ScalarClient");
+}
+
 
 app.UseAuthorization();
 
