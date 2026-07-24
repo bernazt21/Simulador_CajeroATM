@@ -96,21 +96,23 @@ public sealed class CajeroService : ICajeroService
     }
 
     public async Task CambiarNipAsync(
-        CambioNipRequest request,
-        CancellationToken cancellationToken = default)
+    int idTarjeta,
+    CambioNipRequest request,
+    CancellationToken cancellationToken = default)
     {
+        if (idTarjeta <= 0)
+        {
+            throw new ReglaNegocioException(
+                "El identificador de la tarjeta no es válido.");
+        }
+
         if (request is null)
         {
             throw new ReglaNegocioException(
                 "Los datos para cambiar el NIP son obligatorios.");
         }
 
-        if (request.IdTarjeta <= 0)
-        {
-            throw new ReglaNegocioException(
-                "El identificador de la tarjeta no es válido.");
-        }
-
+        ValidarNip(request.NipActual);
         ValidarNip(request.NuevoNip);
 
         if (request.NuevoNip != request.ConfirmacionNuevoNip)
@@ -119,14 +121,81 @@ public sealed class CajeroService : ICajeroService
                 "El nuevo NIP y su confirmación no coinciden.");
         }
 
+        if (request.NipActual == request.NuevoNip)
+        {
+            throw new ReglaNegocioException(
+                "El nuevo NIP debe ser diferente al NIP actual.");
+        }
+
+        var tarjeta =
+            await _tarjetaRepository.ObtenerPorIdAsync(
+                idTarjeta,
+                cancellationToken);
+
+        if (tarjeta is null)
+        {
+            throw new ReglaNegocioException(
+                "La tarjeta no existe.");
+        }
+
+        if (!tarjeta.Activa)
+        {
+            throw new ReglaNegocioException(
+                "La tarjeta se encuentra inactiva.");
+        }
+
+        if (tarjeta.Bloqueada)
+        {
+            throw new ReglaNegocioException(
+                "La tarjeta se encuentra bloqueada.");
+        }
+
+        if (tarjeta.FechaExpiracion.Date < DateTime.Today)
+        {
+            throw new ReglaNegocioException(
+                "La tarjeta se encuentra vencida.");
+        }
+
+        var nipActualCorrecto = _nipHasher.Verificar(
+            request.NipActual,
+            tarjeta.NipHash);
+
+        if (!nipActualCorrecto)
+        {
+            tarjeta.RegistrarIntentoFallido();
+
+            await _tarjetaRepository.ActualizarEstadoAsync(
+                tarjeta,
+                cancellationToken);
+
+            if (tarjeta.Bloqueada)
+            {
+                throw new ReglaNegocioException(
+                    "El NIP actual es incorrecto. La tarjeta fue bloqueada después de tres intentos fallidos.");
+            }
+
+            throw new ReglaNegocioException(
+                $"El NIP actual es incorrecto. Intentos fallidos: {tarjeta.IntentosFallidos} de 3.");
+        }
+
         var nuevoNipHash = _nipHasher.GenerarHash(
             request.NuevoNip);
 
         await _tarjetaRepository.CambiarNipAsync(
-            request.IdTarjeta,
+            idTarjeta,
             nuevoNipHash,
             cancellationToken);
+
+        if (tarjeta.IntentosFallidos > 0)
+        {
+            tarjeta.ReiniciarIntentosFallidos();
+
+            await _tarjetaRepository.ActualizarEstadoAsync(
+                tarjeta,
+                cancellationToken);
+        }
     }
+
 
     public async Task<MovimientoResultadoDto> RevertirTransaccionAsync(
         long idTransaccion,
@@ -159,8 +228,8 @@ public sealed class CajeroService : ICajeroService
     }
 
     public async Task<AutenticacionResultadoDto> AutenticarAsync(
-    AutenticacionRequest request,
-    CancellationToken cancellationToken = default)
+        AutenticacionRequest request,
+        CancellationToken cancellationToken = default)
     {
         if (request is null)
         {

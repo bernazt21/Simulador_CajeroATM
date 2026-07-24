@@ -17,6 +17,7 @@ public interface ICajeroService
         CancellationToken cancellationToken = default);
 
     Task CambiarNipAsync(
+        int idTarjeta,
         CambioNipRequest request,
         CancellationToken cancellationToken = default);
 

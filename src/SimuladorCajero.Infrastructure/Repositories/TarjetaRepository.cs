@@ -18,6 +18,90 @@ public sealed class TarjetaRepository : ITarjetaRepository
                 nameof(connectionFactory));
     }
 
+    public async Task<Tarjeta?> ObtenerPorIdAsync(
+    int idTarjeta,
+    CancellationToken cancellationToken = default)
+    {
+        if (idTarjeta <= 0)
+        {
+            return null;
+        }
+
+        const string sql = """
+        SELECT
+            IdTarjeta,
+            IdCuenta,
+            NumeroTarjeta,
+            NipHash,
+            Bloqueada,
+            IntentosFallidos,
+            FechaExpiracion,
+            Activa,
+            FechaCreacion
+        FROM dbo.Tarjetas
+        WHERE IdTarjeta = @IdTarjeta;
+        """;
+
+        await using var connection =
+            _connectionFactory.CrearConexion();
+
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command =
+            new SqlCommand(sql, connection);
+
+        command.Parameters.Add(
+            new SqlParameter(
+                "@IdTarjeta",
+                SqlDbType.Int)
+            {
+                Value = idTarjeta
+            });
+
+        await using var reader =
+            await command.ExecuteReaderAsync(
+                cancellationToken);
+
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var tarjeta = new Tarjeta
+        {
+            IdTarjeta = reader.GetInt32(
+                reader.GetOrdinal("IdTarjeta")),
+
+            IdCuenta = reader.GetInt32(
+                reader.GetOrdinal("IdCuenta")),
+
+            NumeroTarjeta = reader.GetString(
+                reader.GetOrdinal("NumeroTarjeta")),
+
+            FechaExpiracion = reader.GetDateTime(
+                reader.GetOrdinal("FechaExpiracion")),
+
+            Activa = reader.GetBoolean(
+                reader.GetOrdinal("Activa")),
+
+            FechaCreacion = reader.GetDateTime(
+                reader.GetOrdinal("FechaCreacion"))
+        };
+
+        tarjeta.EstablecerNipHash(
+            reader.GetString(
+                reader.GetOrdinal("NipHash")));
+
+        tarjeta.CargarEstadoSeguridad(
+            reader.GetByte(
+                reader.GetOrdinal("IntentosFallidos")),
+            reader.GetBoolean(
+                reader.GetOrdinal("Bloqueada")));
+
+        return tarjeta;
+    }
+
+
     public async Task<Tarjeta?> ObtenerPorNumeroAsync(
         string numeroTarjeta,
         CancellationToken cancellationToken = default)

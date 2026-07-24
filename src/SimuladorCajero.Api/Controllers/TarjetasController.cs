@@ -20,8 +20,12 @@ public sealed class TarjetasController : ControllerBase
     /// <summary>
     /// Cambia el NIP de una tarjeta activa y no bloqueada.
     /// </summary>
-    /// <param name="idTarjeta">Identificador de la tarjeta.</param>
-    /// <param name="request">Nuevo NIP y su confirmación.</param>
+    /// <param name="idTarjeta">
+    /// Identificador de la tarjeta.
+    /// </param>
+    /// <param name="request">
+    /// NIP actual, nuevo NIP y confirmación del nuevo NIP.
+    /// </param>
     /// <param name="cancellationToken">
     /// Token para cancelar la solicitud.
     /// </param>
@@ -30,14 +34,15 @@ public sealed class TarjetasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CambiarNip(
         int idTarjeta,
-        [FromBody] CambioNipRequest request,
+        [FromBody] CambioNipRequest? request,
         CancellationToken cancellationToken)
     {
         if (idTarjeta <= 0)
         {
             return BadRequest(new
             {
-                mensaje = "El identificador de la tarjeta no es válido."
+                mensaje =
+                    "El identificador de la tarjeta no es válido."
             });
         }
 
@@ -45,29 +50,16 @@ public sealed class TarjetasController : ControllerBase
         {
             return BadRequest(new
             {
-                mensaje = "Los datos para cambiar el NIP son obligatorios."
-            });
-        }
-
-        if (request.IdTarjeta != 0 &&
-            request.IdTarjeta != idTarjeta)
-        {
-            return BadRequest(new
-            {
                 mensaje =
-                    "El identificador de la ruta no coincide con el del cuerpo."
+                    "Los datos para cambiar el NIP son obligatorios."
             });
         }
-
-        var solicitud = request with
-        {
-            IdTarjeta = idTarjeta
-        };
 
         try
         {
             await _cajeroService.CambiarNipAsync(
-                solicitud,
+                idTarjeta,
+                request,
                 cancellationToken);
 
             return NoContent();
