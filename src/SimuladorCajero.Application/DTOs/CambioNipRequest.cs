@@ -2,7 +2,7 @@ namespace SimuladorCajero.Application.DTOs;
 
 public sealed record CambioNipRequest
 {
-    public int IdTarjeta { get; init; }
+    public string NipActual { get; init; } = string.Empty;
 
     public string NuevoNip { get; init; } = string.Empty;
 

@@ -4,6 +4,10 @@ namespace SimuladorCajero.Application.Interfaces;
 
 public interface ITarjetaRepository
 {
+    Task<Tarjeta?> ObtenerPorIdAsync(
+        int idTarjeta,
+        CancellationToken cancellationToken = default);
+
     Task<Tarjeta?> ObtenerPorNumeroAsync(
         string numeroTarjeta,
         CancellationToken cancellationToken = default);
